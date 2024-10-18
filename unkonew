@@ -1,0 +1,105 @@
+import java.util.regex.Matcher;
+import java.util.regex.Pattern;
+import java.util.Map;
+
+public class MainProgram {
+    public static void main(String[] args) {
+        // 完整的 JSON 字符串，包含顶层的 title, rseultset, 和 result 数组
+        String jsonString = """
+            {
+                "title": "一覧",
+                "rseultset": {
+                    "count": 1
+                },
+                "result": [
+                    {
+                        "name": "Alice",
+                        "age": 30,
+                        "city": "New York",
+                        "time": "07:30:12",
+                        "pass_umu": true
+                    },
+                    {
+                        "name": "Iris",
+                        "age": 22,
+                        "city": "Tokyo",
+                        "time": "12:12:12",
+                        "pass_umu": false
+                    }
+                ]
+            }
+        """;
+
+        // 首先处理 "result" 数组，定义正则表达式以找到 result 数组的开始和结束
+        Pattern resultArrayPattern = Pattern.compile("\"result\":\\s*\\[(.*)]", Pattern.DOTALL);
+        Matcher resultArrayMatcher = resultArrayPattern.matcher(jsonString);
+
+        if (resultArrayMatcher.find()) {
+            // 获取 result 数组的内容
+            String resultArrayContent = resultArrayMatcher.group(1).trim();
+            // 解析 result 数组中的每个对象
+            processResultObjects(resultArrayContent);
+        } else {
+            System.out.println("No result array found.");
+        }
+    }
+
+    // 方法：处理 result 数组中的每个对象
+    private static void processResultObjects(String resultArrayContent) {
+        // 定义正则表达式，匹配 JSON 对象
+        Pattern objectPattern = Pattern.compile("\\{(.*?)\\}", Pattern.DOTALL);
+        Matcher objectMatcher = objectPattern.matcher(resultArrayContent);
+
+        // 遍历 result 数组中的每个对象
+        while (objectMatcher.find()) {
+            String currentObject = objectMatcher.group(1).trim();  // 获取当前对象的内容
+            processSingleObject(currentObject);  // 处理单个对象
+        }
+    }
+
+    // 方法：处理 result 数组中的单个对象
+    private static void processSingleObject(String objectContent) {
+        boolean skipCurrentObject = false;  // 标记是否跳过当前对象
+        StringBuilder currentObject = new StringBuilder();  // 用于存储当前对象的键值对
+
+        // 定义正则表达式，匹配键值对
+        Pattern keyValuePattern = Pattern.compile("\"([^\"]+)\":\\s*(\"[^\"]*\"|\\d+|true|false|null)", Pattern.DOTALL);
+        Matcher keyValueMatcher = keyValuePattern.matcher(objectContent);
+
+        // 遍历对象中的键值对
+        while (keyValueMatcher.find()) {
+            String key = keyValueMatcher.group(1).trim();  // 获取键
+            String value = keyValueMatcher.group(2).trim();  // 获取值
+
+            // 去除字符串值中的引号
+            if (value.startsWith("\"") && value.endsWith("\"")) {
+                value = value.substring(1, value.length() - 1);
+            }
+
+            // 将键值对临时存储到 currentObject 中
+            currentObject.append(key).append(": ").append(value).append("\n");
+
+            // 检查 pass_umu 键
+            if (key.equals("pass_umu")) {
+                // 当 pass_umu 为 true 时，标记跳过当前对象
+                skipCurrentObject = value.equals("true");
+            }
+        }
+
+        // 如果不需要跳过该对象，则提取并处理字段
+        if (!skipCurrentObject) {
+            // 调用 FieldExtractor 类来提取字段
+            Map<String, String> extractedFields = FieldExtractor.extractFields(currentObject.toString(), "name", "age", "city");
+
+            // 使用提取的字段值
+            String name = extractedFields.get("name");
+            String age = extractedFields.get("age");
+            String city = extractedFields.get("city");
+
+            // 后续处理这些变量（这里暂时输出以作示例）
+            System.out.println("Name: " + name);
+            System.out.println("Age: " + age);
+            System.out.println("City: " + city);
+        }
+    }
+}
